@@ -1,0 +1,279 @@
+<%- include('../partials/head', { title: title || 'Manage Users - Admin Dashboard', hasNavbar: true }) %>
+<%- include('../partials/navbar', { user: typeof user !== 'undefined' ? user : null }) %>
+
+<div class="container container-full" style="margin-top: 100px;">
+  <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <div>
+      <h1><i class="fas fa-users" style="color: #f7971e;"></i> Manage Users</h1>
+      <p style="font-size: 16px; color: #555; margin-top: 10px;">View, edit, and manage all users</p>
+    </div>
+    <a href="/admin<%= typeof token !== 'undefined' && token ? '?token=' + token : '' %>" class="btn btn-secondary" style="padding: 10px 20px;">
+      <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+  </div>
+
+  <!-- Search and Filters -->
+  <div style="background: #ffffff8c; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <input type="text" id="searchInput" placeholder="Search users by email, username, or name..." 
+           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 14px;"
+           onkeyup="searchUsers()">
+  </div>
+
+  <!-- Users Table -->
+  <div style="background: #0e8389; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <div id="loading" style="text-align: center; padding: 40px; color: #666;">
+      <i class="fas fa-spinner fa-spin" style="font-size: 32px;"></i>
+      <p>Loading users...</p>
+    </div>
+    <div id="usersTable" style="display: none;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: #f7971e; color: white;">
+            <th style="padding: 15px; text-align: left;">ID</th>
+            <th style="padding: 15px; text-align: left;">Email</th>
+            <th style="padding: 15px; text-align: left;">Username</th>
+            <th style="padding: 15px; text-align: left;">Full Name</th>
+            <th style="padding: 15px; text-align: left;">Status</th>
+            <th style="padding: 15px; text-align: left;">Admin</th>
+            <th style="padding: 15px; text-align: left;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody">
+        </tbody>
+      </table>
+      <div id="pagination" style="padding: 20px; text-align: center; border-top: 1px solid #e0e0e0;"></div>
+    </div>
+    <div id="noUsers" style="display: none; text-align: center; padding: 40px; color: #666;">
+      <i class="fas fa-users" style="font-size: 48px; opacity: 0.3; margin-bottom: 15px;"></i>
+      <p>No users found</p>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+  <div style="background: white; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+    <h2 style="margin-bottom: 20px; color: #2b3a55;">Edit User</h2>
+    <form id="editUserForm">
+      <input type="hidden" id="editUserId">
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; color: #2b3a55; font-weight: 600;">Email</label>
+        <input type="email" id="editEmail" required style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px;">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; color: #2b3a55; font-weight: 600;">Username</label>
+        <input type="text" id="editUsername" required style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px;">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; color: #2b3a55; font-weight: 600;">Full Name</label>
+        <input type="text" id="editFullName" required style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px;">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; color: #2b3a55; font-weight: 600;">Location</label>
+        <input type="text" id="editLocation" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px;">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: flex; align-items: center; gap: 10px;">
+          <input type="checkbox" id="editIsActive">
+          <span style="color: #2b3a55; font-weight: 600;">Active</span>
+        </label>
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: flex; align-items: center; gap: 10px;">
+          <input type="checkbox" id="editIsAdmin">
+          <span style="color: #2b3a55; font-weight: 600;">Admin</span>
+        </label>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 25px;">
+        <button type="submit" class="btn" style="flex: 1;">Save Changes</button>
+        <button type="button" onclick="closeEditModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const token = '<%= typeof token !== "undefined" ? token : "" %>';
+let currentPage = 1;
+let currentSearch = '';
+
+async function loadUsers(page = 1, search = '') {
+  try {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('usersTable').style.display = 'none';
+    document.getElementById('noUsers').style.display = 'none';
+
+    const url = `/api/v1/admin/users?page=${page}&limit=20${search ? '&search=' + encodeURIComponent(search) : ''}`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to load users');
+
+    const result = await response.json();
+    if (result.success) {
+      const users = result.data.users;
+      const pagination = result.data.pagination;
+
+      if (users.length === 0) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('noUsers').style.display = 'block';
+        return;
+      }
+
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = users.map(user => `
+        <tr style="border-bottom: 1px solid #e0e0e0;">
+          <td style="padding: 15px;">${user.id}</td>
+          <td style="padding: 15px;">${user.email}</td>
+          <td style="padding: 15px;">${user.username}</td>
+          <td style="padding: 15px;">${user.full_name || '-'}</td>
+          <td style="padding: 15px;">
+            <span style="padding: 5px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; 
+                         background: ${user.is_active ? '#d4edda' : '#f8d7da'}; 
+                         color: ${user.is_active ? '#155724' : '#721c24'};">
+              ${user.is_active ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+          <td style="padding: 15px;">
+            ${user.is_admin ? '<i class="fas fa-shield-alt" style="color: #f7971e;"></i>' : '-'}
+          </td>
+          <td style="padding: 15px;">
+            <button onclick="editUser('${user.id}')" class="btn btn-small" style="margin-right: 5px;">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button onclick="deleteUser('${user.id}', '${(user.email || '').replace(/'/g, "\\'")}')" class="btn btn-small" style="background: #dc3545;">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      // Pagination
+      const paginationDiv = document.getElementById('pagination');
+      paginationDiv.innerHTML = `
+        <button onclick="loadUsers(${pagination.page - 1}, '${search}')" 
+                ${pagination.page <= 1 ? 'disabled' : ''} 
+                class="btn btn-small" style="margin-right: 10px;">
+          <i class="fas fa-chevron-left"></i> Previous
+        </button>
+        <span style="margin: 0 15px;">Page ${pagination.page} of ${pagination.pages}</span>
+        <button onclick="loadUsers(${pagination.page + 1}, '${search}')" 
+                ${pagination.page >= pagination.pages ? 'disabled' : ''} 
+                class="btn btn-small">
+          Next <i class="fas fa-chevron-right"></i>
+        </button>
+      `;
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('usersTable').style.display = 'block';
+      currentPage = page;
+    }
+  } catch (error) {
+    console.error('Error loading users:', error);
+    alert('Failed to load users. Please refresh the page.');
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+function searchUsers() {
+  const search = document.getElementById('searchInput').value;
+  currentSearch = search;
+  loadUsers(1, search);
+}
+
+async function editUser(userId) {
+  try {
+    const response = await fetch(`/api/v1/admin/users/${userId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const result = await response.json();
+    if (result.success) {
+      const user = result.data;
+      document.getElementById('editUserId').value = user.id;
+      document.getElementById('editEmail').value = user.email || '';
+      document.getElementById('editUsername').value = user.username || '';
+      document.getElementById('editFullName').value = user.full_name || '';
+      document.getElementById('editLocation').value = user.location || '';
+      document.getElementById('editIsActive').checked = !!user.is_active;
+      document.getElementById('editIsAdmin').checked = !!user.is_admin;
+      document.getElementById('editModal').style.display = 'flex';
+    }
+  } catch (error) {
+    console.error('Error loading user:', error);
+    alert('Failed to load user details');
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+}
+
+document.getElementById('editUserForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const userId = document.getElementById('editUserId').value;
+  const data = {
+    email: document.getElementById('editEmail').value,
+    username: document.getElementById('editUsername').value,
+    full_name: document.getElementById('editFullName').value,
+    location: document.getElementById('editLocation').value,
+    is_active: document.getElementById('editIsActive').checked,
+    is_admin: document.getElementById('editIsAdmin').checked
+  };
+
+  try {
+    const response = await fetch(`/api/v1/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      alert('User updated successfully!');
+      closeEditModal();
+      loadUsers(currentPage, currentSearch);
+    } else {
+      alert(result.error || 'Failed to update user');
+    }
+  } catch (error) {
+    console.error('Error updating user:', error);
+    alert('Failed to update user');
+  }
+});
+
+async function deleteUser(userId, userEmail) {
+  if (!confirm(`Are you sure you want to delete user "${userEmail}"? This action cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/v1/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      alert('User deleted successfully!');
+      loadUsers(currentPage, currentSearch);
+    } else {
+      alert(result.error || 'Failed to delete user');
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    alert('Failed to delete user');
+  }
+}
+
+// Load users on page load
+loadUsers();
+</script>
+
+<%- include('../partials/scripts') %>
+

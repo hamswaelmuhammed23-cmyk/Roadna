@@ -1,0 +1,48 @@
+<nav style="position:fixed;top:0;left:0;right:0;z-index:200;
+            background:rgba(255,255,255,0.96);backdrop-filter:blur(10px);
+            padding:12px 28px;display:flex;align-items:center;
+            justify-content:space-between;
+            box-shadow:0 2px 12px rgba(0,0,0,0.12);">
+
+  <!-- Logo -->
+  <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+    <span style="font-size:22px;">✈️</span>
+    <span style="font-size:19px;font-weight:700;color:#2b3a55;letter-spacing:-0.3px;">
+      Road<span style="color:#4ec5b0;">na</span>
+      <span style="font-size:11px;background:#f7971e;color:#fff;
+                   padding:2px 8px;border-radius:4px;font-weight:700;
+                   margin-left:6px;vertical-align:middle;">ADMIN</span>
+    </span>
+  </a>
+
+  <!-- Nav links -->
+  <% if (typeof user !== 'undefined' && user) { %>
+  <div style="display:flex;align-items:center;gap:20px;font-size:14px;color:#2b3a55;">
+    <a href="/admin<%= typeof token !== 'undefined' && token ? '?token=' + token : '' %>"
+       style="text-decoration:none;color:#2b3a55;font-weight:500;">
+      <i class="fas fa-tachometer-alt" style="color:#f7971e;"></i> Dashboard
+    </a>
+    <a href="/admin/users<%= typeof token !== 'undefined' && token ? '?token=' + token : '' %>"
+       style="text-decoration:none;color:#2b3a55;font-weight:500;">
+      <i class="fas fa-users" style="color:#f7971e;"></i> Users
+    </a>
+    <a href="/admin/trips<%= typeof token !== 'undefined' && token ? '?token=' + token : '' %>"
+       style="text-decoration:none;color:#2b3a55;font-weight:500;">
+      <i class="fas fa-route" style="color:#f7971e;"></i> Trips
+    </a>
+    <a href="/admin/events<%= typeof token !== 'undefined' && token ? '?token=' + token : '' %>"
+       style="text-decoration:none;color:#2b3a55;font-weight:500;">
+      <i class="fas fa-calendar-alt" style="color:#f7971e;"></i> Events
+    </a>
+    <span style="color:#ccc;">|</span>
+    <span style="font-weight:600;">
+      <i class="fas fa-user-shield" style="color:#f7971e;"></i>
+      <%= user.fullName || user.full_name || user.email || 'Admin' %>
+    </span>
+    <a href="/login"
+       style="color:#dc3545;text-decoration:none;font-weight:600;">
+      <i class="fas fa-sign-out-alt"></i> Logout
+    </a>
+  </div>
+  <% } %>
+</nav>
